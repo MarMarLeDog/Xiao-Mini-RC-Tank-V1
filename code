@@ -1,0 +1,306 @@
+#include <WiFi.h>
+#include <WebServer.h>
+
+
+const int motor1In1 = 2;
+const int motor1In2 = 3;
+const int motor2In1 = 4;
+const int motor2In2 = 5;
+
+const int pwmFreq = 2000;
+const int pwmRes = 8;
+
+const int pwmChannel1A = 0;
+const int pwmChannel1B = 1;
+const int pwmChannel2A = 2;
+const int pwmChannel2B = 3;
+
+const char* ssid = "XIAO_TANK";
+const char* password = "12345678";
+
+WebServer server(80);
+
+const char* htmlHomePage PROGMEM = R"HTML(
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Mini Xiao RC Tank</title>
+  <style>
+    body {
+      background: #f4f4f4;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+    }
+    h1 {
+      color: #222;
+      margin-top: 32px;
+      margin-bottom: 38px;
+      font-size: 2.1em;
+      letter-spacing: 0.5px;
+      z-index: 11;
+      position: relative;
+    }
+    .controller {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 26vw; 
+      margin-top: 48px; 
+      margin-bottom: 0;
+      z-index: 10;
+      position: relative;
+    }
+    .slider-vertical-container {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
+      height: 830px;   
+      min-width: 80px;
+      position: relative;
+      z-index: 10;
+    }
+    .vertical-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 800px;  
+      height: 54px;
+      transform: rotate(-90deg);
+      background: #e6e6e6;
+      border-radius: 27px;
+      outline: none;
+      transition: background 0.2s;
+      margin: 0;
+      box-shadow: 0 1px 8px #bbb5;
+      touch-action: none;
+      position: relative;
+      padding: 0;
+      display: block;
+    }
+    .vertical-slider:focus { background: #f7eaea; }
+    .vertical-slider::-webkit-slider-runnable-track {
+      height: 54px;
+      background: #e6e6e6;
+      border-radius: 27px;
+    }
+    .vertical-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: #c00;
+      cursor: pointer;
+      box-shadow: 0 2px 8px #8884;
+      border: 3px solid #fff;
+      position: relative;
+      margin: 0;
+      transition: background 0.2s;
+      display: block;
+    }
+    .vertical-slider:active::-webkit-slider-thumb { background: #a00; }
+    .vertical-slider::-moz-range-thumb {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: #c00;
+      cursor: pointer;
+      border: 3px solid #fff;
+      display: block;
+    }
+    .vertical-slider:focus { outline: none; }
+    .vertical-slider::-ms-fill-lower {
+      background: #e6e6e6;
+      border-radius: 27px;
+    }
+    .vertical-slider::-ms-fill-upper {
+      background: #e6e6e6;
+      border-radius: 27px;
+    }
+    .vertical-slider:focus::-ms-fill-lower { background: #f7eaea; }
+    .vertical-slider:focus::-ms-fill-upper { background: #f7eaea; }
+
+    .values-row-center {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: center;
+      margin: 0 auto;
+      margin-top: 48px; 
+      margin-bottom: 0;
+      gap: 160px;
+      width: 100%;
+      max-width: 1200px;
+    }
+    .slider-value {
+      display: inline-block;
+      font-size: 2.3em;
+      color: #c00;
+      font-family: monospace;
+      user-select: none;
+      min-width: 64px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-align: center;
+      background: #fff8;
+      border-radius: 10px;
+      padding: 4px 18px;
+      margin: 0 8px;
+      box-shadow: 0 1px 8px #bbb5;
+      border: 2px solid #c00;
+    }
+    .slider-label {
+      font-size: 1.1em;
+      color: #444;
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      letter-spacing: 1px;
+    }
+    @media (max-width: 1100px) {
+      .controller { gap: 10vw; }
+      .slider-vertical-container { height: 430px; }
+      .vertical-slider { width: 340px; height: 54px; }
+      .values-row-center { gap: 70px; max-width: 600px; }
+    }
+    @media (max-width: 900px), (orientation: portrait) {
+      .controller { gap: 2vw; }
+      .slider-vertical-container { height: 250px; min-width: 44px; }
+      .vertical-slider { width: 120px; height: 34px; }
+      .vertical-slider::-webkit-slider-thumb,
+      .vertical-slider::-moz-range-thumb { width: 34px; height: 34px; }
+      .values-row-center { gap: 20px; max-width: 300px; margin-top: 22px;}
+      .slider-value { font-size: 1.2em; min-width: 30px; }
+    }
+    @media (max-width: 450px) {
+      .controller { gap: 1vw; }
+      .slider-vertical-container { height: 110px; min-width: 30px;}
+      .vertical-slider { width: 60px; height: 16px; }
+      .vertical-slider::-webkit-slider-thumb,
+      .vertical-slider::-moz-range-thumb { width: 16px; height: 16px; }
+      .values-row-center { gap: 3vw; max-width: 95vw; margin-top: 10px;}
+      .slider-value { font-size: 0.85em; min-width: 15px; }
+      h1 { font-size: 1.1em; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Mini Xiao RC Tank</h1>
+  <div class="controller">
+    <div class="slider-vertical-container">
+      <input type="range" min="-255" max="255" value="0" class="vertical-slider" id="motor1" step="1" oninput="sendSlider('motor1', value)">
+    </div>
+    <div class="slider-vertical-container">
+      <input type="range" min="-255" max="255" value="0" class="vertical-slider" id="motor2" step="1" oninput="sendSlider('motor2', value)">
+    </div>
+  </div>
+  <div class="values-row-center">
+    <div>
+      <span class="slider-label">L</span>
+      <span id="motor1-value" class="slider-value">0</span>
+    </div>
+    <div>
+      <span class="slider-label">R</span>
+      <span id="motor2-value" class="slider-value">0</span>
+    </div>
+  </div>
+  <script>
+    // Threshold for "0 zone" (deadband)
+    const deadZone = 25; // Range +/- this value around 0 is considered stop
+
+    function sendSlider(motor, val) {
+      val = parseInt(val);
+      let sendVal = (Math.abs(val) < deadZone) ? 0 : val;
+      document.getElementById(motor + "-value").textContent = sendVal;
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", "/" + motor + "?val=" + sendVal, true);
+      xhr.send();
+    }
+    window.onload = function() {
+      document.getElementById('motor1').value = 0;
+      document.getElementById('motor2').value = 0;
+      sendSlider('motor1', 0);
+      sendSlider('motor2', 0);
+    };
+  </script>
+</body>
+</html>
+)HTML";
+
+void setMotorPWM(int pwmChannelA, int pwmChannelB, int value) {
+  if (abs(value) < 25) {
+    ledcWrite(pwmChannelA, 0);
+    ledcWrite(pwmChannelB, 0);
+  } else if (value > 0) {
+    ledcWrite(pwmChannelA, abs(value));
+    ledcWrite(pwmChannelB, 0);
+  } else if (value < 0) {
+    ledcWrite(pwmChannelA, 0);
+    ledcWrite(pwmChannelB, abs(value));
+  }
+}
+
+void handleRoot() {
+  server.send_P(200, "text/html", htmlHomePage);
+}
+
+void handleMotor1() {
+  if (server.hasArg("val")) {
+    int v = server.arg("val").toInt();
+    v = constrain(v, -255, 255);
+    setMotorPWM(pwmChannel1A, pwmChannel1B, v);
+    server.send(200, "text/plain", String("Motor1: ") + v);
+  } else {
+    server.send(400, "text/plain", "Missing value");
+  }
+}
+
+void handleMotor2() {
+  if (server.hasArg("val")) {
+    int v = server.arg("val").toInt();
+    v = constrain(v, -255, 255);
+    setMotorPWM(pwmChannel2A, pwmChannel2B, v);
+    server.send(200, "text/plain", String("Motor2: ") + v);
+  } else {
+    server.send(400, "text/plain", "Missing value");
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(motor1In1, OUTPUT);
+  pinMode(motor1In2, OUTPUT);
+  pinMode(motor2In1, OUTPUT);
+  pinMode(motor2In2, OUTPUT);
+
+  ledcSetup(pwmChannel1A, pwmFreq, pwmRes);
+  ledcSetup(pwmChannel1B, pwmFreq, pwmRes);
+  ledcSetup(pwmChannel2A, pwmFreq, pwmRes);
+  ledcSetup(pwmChannel2B, pwmFreq, pwmRes);
+
+  ledcAttachPin(motor1In1, pwmChannel1A);
+  ledcAttachPin(motor1In2, pwmChannel1B);
+  ledcAttachPin(motor2In1, pwmChannel2A);
+  ledcAttachPin(motor2In2, pwmChannel2B);
+
+  WiFi.softAP(ssid, password);
+  IPAddress IP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(IP);
+
+  server.on("/", HTTP_GET, handleRoot);
+  server.on("/motor1", HTTP_GET, handleMotor1);
+  server.on("/motor2", HTTP_GET, handleMotor2);
+
+  server.begin();
+  Serial.println("HTTP server started");
+}
+
+void loop() {
+  server.handleClient();
+}
